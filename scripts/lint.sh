@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Static checks: compose file, shell scripts, YAML. Needs only Docker.
+# Static checks: compose file, shell scripts, YAML, the Go generator.
+# Needs only Docker.
 #
 #   ./scripts/lint.sh        check
 #   ./scripts/lint.sh fix    reformat shell scripts in place
@@ -27,5 +28,13 @@ in_docker mvdan/shfmt:v3 -d -i 2 -ci scripts
 echo '==> yamllint'
 in_docker python:3-alpine sh -c \
   'pip install -q --root-user-action=ignore --disable-pip-version-check yamllint && yamllint .'
+
+echo '==> gofmt, go vet, sql/messenger.sql is up to date'
+# shellcheck disable=SC2016 # expanded inside the container, not here
+in_docker golang:1.26-alpine sh -ec '
+  test -z "$(gofmt -l cmd)" || { echo "gofmt needed:"; gofmt -l cmd; exit 1; }
+  go vet ./...
+  go run ./cmd/demogen -size s | cmp - sql/messenger.sql
+'
 
 echo 'Lint passed.'
